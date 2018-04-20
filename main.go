@@ -113,53 +113,24 @@ func resourceManifestUpdate(d *schema.ResourceData, m interface{}) error {
 	return run(cmd)
 }
 
-func resourceFromSelflink(s string) (resource, namespace string, ok bool) {
-	parts := strings.Split(s, "/")
-	if len(parts) < 2 {
-		return "", "", false
-	}
-	resource = parts[len(parts)-2] + "/" + parts[len(parts)-1]
-
-	for i, part := range parts {
-		if part == "namespaces" && len(parts) > i+1 {
-			namespace = parts[i+1]
-			break
-		}
-	}
-	return resource, namespace, true
-}
-
 func resourceManifestDelete(d *schema.ResourceData, m interface{}) error {
-	resource, namespace, ok := resourceFromSelflink(d.Id())
-	if !ok {
-		return fmt.Errorf("invalid resource id: %s", d.Id())
-	}
-	args := []string{"delete", resource}
-	if namespace != "" {
-		args = append(args, "-n", namespace)
-	}
-	return run(exec.Command("kubectl", args...))
+	cmd := exec.Command("kubectl", "delete", "-f", "-")
+	cmd.Stdin = strings.NewReader(d.Get("content").(string))
+	return run(cmd)
 }
 
 func resourceManifestRead(d *schema.ResourceData, m interface{}) error {
-	resource, namespace, ok := resourceFromSelflink(d.Id())
-	if !ok {
-		return fmt.Errorf("invalid resource id: %s", d.Id())
-	}
-
-	args := []string{"get", "--ignore-not-found", resource}
-	if namespace != "" {
-		args = append(args, "-n", namespace)
-	}
-
+	args := []string{"get", "--raw=\"", d.Id(), "\""}
 	stdout := &bytes.Buffer{}
 	cmd := exec.Command("kubectl", args...)
 	cmd.Stdout = stdout
+	if strings.HasPrefix(strings.TrimSpace(stdout.String()), "Error from server (NotFound)") {
+		d.SetId("")
+		// Ignore this expected error.
+		return nil
+	}
 	if err := run(cmd); err != nil {
 		return err
-	}
-	if strings.TrimSpace(stdout.String()) == "" {
-		d.SetId("")
 	}
 	return nil
 }
