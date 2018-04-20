@@ -120,7 +120,7 @@ func resourceManifestDelete(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceManifestRead(d *schema.ResourceData, m interface{}) error {
-	args := []string{"get", "--raw=\"", d.Id(), "\""}
+	args := []string{"get", "--raw\"" + d.Id() + "\""}
 	stdout := &bytes.Buffer{}
 	cmd := exec.Command("kubectl", args...)
 	cmd.Stdout = stdout
